@@ -4,16 +4,18 @@
 Adopt the `cper-codex` copier template into the live neuroctrl repository with controlled, auditable updates.
 
 ## Template source
-- Template repo: `https://github.com/fatb4f/cper-codex`
-- Pin a specific ref (tag or commit) in `.copier-answers.yml` before adoption.
+- Preferred (local): `/home/src404/src/cper-codex`
+- Fallback (remote): `https://github.com/fatb4f/cper-codex`
+- Pin a specific ref (tag or commit) in `.copier-answers.yml` before adoption (or record a local commit SHA for traceability).
+ - To switch back to remote, replace `_template` and `_src_path` in `.copier-answers.yml` with the remote URL and pin a ref.
 
 ## Managed scope
 Treat these paths as template-managed after adoption:
 - `.codex/`
-- `control/`
 - `docs/`
 - `tools/`
 - `ledger/`
+- `packet/`
 - `README.md`
 - `AGENTS.md`
 - `.gitignore`
@@ -36,6 +38,7 @@ All other paths are local-only unless explicitly added to the template scope.
 ## Verification (mechanical checks)
 - `test -f .copier-answers.yml`
 - `rg --files -g '!*'` to list files and verify changes are limited to managed paths.
+ - `test -d packet` and confirm no `control/` path is introduced.
 
 ## Update policy
 - Updates occur only via `copier update` from the pinned template ref.

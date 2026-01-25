@@ -1,5 +1,5 @@
-_template: https://github.com/fatb4f/cper-codex.git
-_src_path: https://github.com/fatb4f/cper-codex.git
+_template: /home/src404/src/cper-codex
+_src_path: /home/src404/src/cper-codex
 project_name: "neuroctrl"
 project_slug: "neuroctrl"
 description: "Repo-backed Cognitive Control System"
