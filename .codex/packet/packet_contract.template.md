@@ -1,41 +1,53 @@
-# Packet: <packet-id> — <title>
+# Packet Contract (SSOT)
 
-**Domain:** <engineering|operations>  
-**Area:** <content-gen|pipeline-sre|engineering|ops>  
-**Status:** DRAFT
+This document describes the packet contract. The single source of truth for generation is
+`.codex/packet/packet_contract.template.json`.
 
-## Purpose
-<one paragraph>
+> Copy to `packet/examples/<packet_id>.json` and fill in.
 
-## Scope boundary (illegal moves)
-- <illegal move 1>
-- <illegal move 2>
+## Identity
+- packet_id: "packet-001-worktree-collab"
+- area: "pipeline-sre" | "engineering" | "content-gen"
+- repo: "<org>/<repo>" (or local path)
 
-## Inputs
-- Files/dirs assumed to exist:
-  - `<path>`
-- External requirements (if any):
-  - `<requirement>`
+## Git
+- base_ref: "main" (or tag/sha)
+- branch: "packet/<packet_id>"
+- github_ops_required: false
 
-## Outputs (exact paths)
-- `<path>`
-- `<path>`
+## Path controls
+- allowed_paths: [".codex/"]
+- forbidden_outputs: []
+  - Use this list only for outputs that must not appear in git diffs or tracked files.
+  - Runtime directories like `.codex/out/` and `.codex/.worktrees/` are allowed to exist and should be ignored via `.gitignore`.
 
-## End-state predicate (mechanical)
-- Command(s) to run:
-  - `...`
-- Expected results:
-  - `...`
+## Worktree policy (required)
+- worktree_policy:
+    mode: "strict" | "allow_dirty_allowlist"
+    worktree_root: ".codex/.worktrees"
+    deny_if_worktree_exists: true
+    allow_dirty_globs: []          # used only when mode=allow_dirty_allowlist
+    allow_untracked_globs: []      # used only when mode=allow_dirty_allowlist
 
-## Evidence artifacts (paths)
-- `<path>`
-- `<path>`
+## Network policy (required)
+- network_policy:
+    internet_access: "off" | "on"
+    domain_allowlist_preset: "none" | "corp" | "public"
+    additional_domains: []
+    allowed_http_methods: []
 
-## Failure modes / rollback
-- <what can go wrong>
-- <how to revert safely>
+## Execution
+- run:
+    regen_cmd: ""                 # optional
+    test_cmd: ""                  # optional
+    commands: []                   # optional list of additional commands (strings)
 
-## Forbidden actions
-- Network access (unless explicitly allowed)
-- Large refactors outside scope
-- Changing policy/contracts without updating evidence
+## Budgets (optional)
+- budgets:
+    max_changed_files: 200
+    max_changed_lines: 20000
+
+## Evidence (required)
+- evidence:
+    out_dir: ".codex/out"         # evidence is written under .codex/out/<packet_id>/
+    include_git_diff_patch: false

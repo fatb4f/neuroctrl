@@ -4,16 +4,19 @@ Repo skeleton for a **repo-backed Cognitive Control System** with a **packet-bas
 
 ## Key directories
 
-- `.codex/skills/` — Codex-discoverable skills (per official Codex skills docs).
-- `.codex/packet/` — Packet templates + shared packet assets (repo SSOT for packet content).
-- `control/packet/` — Packet contracts + schemas (controller-side SSOT).
-- `control/schemas/` — JSON Schemas for runtime artifacts (placeholder in this base repo).
-- `control/catalog/` — Policies/catalogs (placeholder in this base repo).
-- `tools/` — Deterministic controllers/validators (placeholder in this base repo).
-- `ledger/` — Append-only logs / run artifacts (placeholder in this base repo).
+- `.codex/skills/` — Codex-discoverable skills.
+- `.codex/packet/` — Packet templates + shared packet assets (SSOT for packet content).
+- `.codex/tools/` — Canonical packet runner + gates + evidence collector.
+- `.codex/packet/examples/` — Example packet contracts.
+- `.codex/out/` — Evidence output (generated).
+- `.codex/.worktrees/` — Packet worktrees (generated).
+- `docs/` — Local documentation for this repo.
+- `ledger/` — Placeholder for append-only logs / run artifacts.
+- `tools/` — Local tooling notes (see `tools/README.md`).
 
-## Next steps
+## Typical usage
 
-1. Add Packet-0: `tools/packet_runner.py` (mechanical runner) and wire it into the `packet-runner` skill.
-2. Add runtime schemas under `control/schemas/` (time_block, end_pointer, otest_result, preflight_snapshot).
-3. Add policy/catalog YAML under `control/catalog/`.
+1. Create a contract under `.codex/packet/examples/<packet_id>.json`.
+2. Run the packet runner via the skill script:
+   `bash .codex/skills/packet-runner/scripts/run_packet.sh .codex/packet/examples/<packet_id>.json`
+3. Review evidence under `.codex/out/<packet_id>/`.

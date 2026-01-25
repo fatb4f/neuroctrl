@@ -1,26 +1,31 @@
 ---
 name: packet-runner
-description: Run packet checks and emit evidence artifacts for a given control/packet contract.
-metadata:
-  short-description: Packet execution harness (scaffold)
+description: Run a packet contract in an isolated git worktree; enforce cleanliness gates and emit standardized post-run evidence.
 ---
 
-## Scope
-This is a **scaffold** skill: it should only touch the packet/execution scaffolding until the
-deterministic runner exists.
+## Purpose
+Execute a packet contract with:
+1) **Preflight** checks
+2) **Isolated git worktree** provisioning
+3) **Bounded execution**
+4) **Post-run evidence harness** (Packet-002)
 
-## Allowed paths
-- `.codex/**`
-- `control/packet/**`
-- `docs/**`
+This skill entrypoint delegates to the canonical runner:
+- `.codex/tools/run_packet.py`
 
-## Forbidden actions
-- Do not add external dependencies
-- Do not implement runtime tooling yet (no new executable logic under `tools/`)
+## Inputs
+- `contract_path` (required): path to JSON contract.
 
-## Intended workflow (once implemented)
-- Validate a packet contract (JSON) against `control/packet/packet_contract.schema.json`
-- Emit evidence JSON under `ledger/` or `execution/packets/`
+## Outputs (Packet-002)
+Always emits a bundle under:
+- `.codex/out/<packet_id>/...` (see `packet/README.md`)
 
-## Notes
-Add `tools/packet_runner.py` in a later packet and update this skill to invoke it.
+## Hard gates
+- Base repo must be clean unless `worktree_policy.mode=allow_dirty_allowlist`.
+- Worktree must not already exist when `deny_if_worktree_exists=true`.
+- `base_ref` must resolve.
+
+## Minimal invocation
+```bash
+python .codex/skills/packet-runner/scripts/run_packet.py .codex/packet/examples/packet-001-worktree-collab.json
+```

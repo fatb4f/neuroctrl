@@ -1,11 +1,20 @@
 ---
 name: packet-template
-description: Template skill for a packet-specific workflow; copy and rename per packet.
-metadata:
-  short-description: Template only
+description: Scaffold a packet contract example file from the SSOT template.
 ---
 
-## How to use
-1. Copy this folder to `.codex/skills/<packet-id>/`
-2. Update `name`, `description`, and constraints.
-3. Ensure a matching contract exists under `control/packet/<packet-id>.md` or `.json`.
+## Purpose
+Scaffold a new packet contract example file from the SSOT template:
+- `packet/examples/<packet_id>.json`
+
+## Inputs
+- `packet_id` (required)
+- Optional overrides: `area`, `repo`, `base_ref`, `branch`
+
+## Outputs
+- `packet/examples/<packet_id>.json`
+
+## Notes
+This skill does not execute packets; it only scaffolds the contract.
+Use `packet-runner` to execute a packet.
+SSOT templates live in `.codex/packet/`.
