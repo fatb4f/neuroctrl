@@ -1,0 +1,7 @@
+_template: https://github.com/fatb4f/cper-codex.git
+project_name: "neuroctrl"
+project_slug: "neuroctrl"
+description: "Repo-backed Cognitive Control System"
+author_name: ""
+author_email: ""
+domain_emphasis: "mixed"
