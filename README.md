@@ -1,22 +1,20 @@
-# cogctrl (base repository)
+# Codex Plant Surface
 
-Repo skeleton for a **repo-backed Cognitive Control System** with a **packet-based** engineering workflow.
+This directory is the isolated Codex "plant" surface. It is intended to be copied into downstream repos
+as a single folder with no template-managed files outside `.codex/`.
 
-## Key directories
+## Install (downstream)
+```bash
+copier copy <TEMPLATE_URL> .codex
+```
 
-- `.codex/skills/` — Codex-discoverable skills.
-- `.codex/packet/` — Packet templates + shared packet assets (SSOT for packet content).
-- `.codex/tools/` — Canonical packet runner + gates + evidence collector.
-- `.codex/packet/examples/` — Example packet contracts.
-- `.codex/out/` — Evidence output (generated).
-- `.codex/.worktrees/` — Packet worktrees (generated).
-- `docs/` — Local documentation for this repo.
-- `ledger/` — Placeholder for append-only logs / run artifacts.
-- `tools/` — Local tooling notes (see `tools/README.md`).
+## Run a packet
+```bash
+bash .codex/skills/packet-runner/scripts/run_packet.sh .codex/packet/examples/packet-000-foundation.json
+```
 
-## Typical usage
-
-1. Create a contract under `.codex/packet/examples/<packet_id>.json`.
-2. Run the packet runner via the skill script:
-   `bash .codex/skills/packet-runner/scripts/run_packet.sh .codex/packet/examples/<packet_id>.json`
-3. Review evidence under `.codex/out/<packet_id>/`.
+## Evidence output
+Evidence bundles are written under:
+```
+.codex/out/<packet_id>/
+```
