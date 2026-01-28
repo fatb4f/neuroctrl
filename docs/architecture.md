@@ -9,3 +9,5 @@ This repo is intended to implement a repo-backed supervisory control system with
 - Append-only artifacts / ledger
 
 Packet-based evolution is expected: each packet adds a small mechanical capability, with explicit scope boundaries.
+
+See `docs/architecture-outline.md` for the full system architecture and execution plan.
