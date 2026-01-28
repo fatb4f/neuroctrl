@@ -18,3 +18,9 @@ Evidence bundles are written under:
 ```
 .codex/out/<packet_id>/
 ```
+
+## Plant A updates
+`.codex/` is managed as a git subtree from `fatb4f/codex-plant-a`.
+```bash
+git subtree pull --prefix .codex https://github.com/fatb4f/codex-plant-a.git main --squash
+```
