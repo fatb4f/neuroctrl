@@ -209,18 +209,12 @@ A repo-backed supervisory control system that prevents MRV overshoot by:
 ```text
 neuroctrl/
   .codex/
+    packets/
     skills/
       packet-runner/
         SKILL.md
         skill.json
         scripts/
-      packet-01-foundation/
-      packet-02-schemas/
-      packet-03-policy-catalog/
-      packet-04-tools-core/
-      packet-05-ci-gates/
-      packet-06-github-adapter/
-      packet-07-ops-runbooks/
   control/
     schemas/
     catalog/
@@ -233,14 +227,14 @@ neuroctrl/
 
 #### Packet lifecycle
 1. **Select packet** (one domain).
-2. Ensure packet contract exists at `control/packets/<packet-id>.md`.
+2. Ensure packet contract exists at `.codex/packets/<packet-id>/contract.json`.
 3. Run Codex with the packet skill only (no free-form).
 4. Codex outputs artifacts + evidence into repo.
 5. Run mechanical validation locally/CI.
 6. Promote by merge/tag once end-state predicate holds.
 
 #### Packet contract fields (required)
-Each `control/packets/<packet-id>.md` must specify:
+Each `.codex/packets/<packet-id>/contract.json` must specify:
 - **Purpose / scope boundary**
 - **Inputs** (files, existing dirs)
 - **Outputs** (exact paths)
@@ -257,11 +251,11 @@ Each `control/packets/<packet-id>.md` must specify:
 ### 5.3 Engineering packets (architecture + workflow definitions)
 
 #### Packet 0: Packet runner baseline (engineering)
-**Goal:** deterministic execution harness for packets.
+**Goal:** deterministic execution harness for packets (Plant A; already present via subtree).
 - Outputs:
   - `.codex/skills/packet-runner/*`
   - `tools/packet_runner.py` (runs packet checks + emits evidence JSON)
-  - `control/packets/packet_contract.schema.json` + example
+  - `.codex/packets/packet_contract.template.json` + example
 - End-state:
   - `python tools/packet_runner.py --self-test` passes
 
@@ -340,7 +334,7 @@ Each `control/packets/<packet-id>.md` must specify:
 - Tag `v0.2.0` after CI + GitHub adapter.
 
 #### Evidence ledger
-- Each packet run emits `execution/packets/<packet-id>/evidence.json` with:
+- Each packet run emits `.codex/out/<packet_id>/evidence.json` with:
   - inputs manifest
   - outputs manifest
   - validation command outputs
