@@ -23,7 +23,7 @@
     "base_ref": {
       "type": "string",
       "required": false,
-      "description": "Base ref (e.g., main)"
+      "description": "Base ref (e.g., origin/main)"
     },
     "branch": {
       "type": "string",

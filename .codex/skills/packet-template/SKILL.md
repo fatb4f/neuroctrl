@@ -10,6 +10,7 @@ Scaffold a new packet contract example file from the SSOT template:
 ## Inputs
 - `packet_id` (required)
 - Optional overrides: `area`, `repo`, `base_ref`, `branch`
+  - Default `base_ref`: `main`
 
 ## Outputs
 - `packet/examples/<packet_id>.json`

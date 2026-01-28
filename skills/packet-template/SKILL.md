@@ -18,4 +18,4 @@ Scaffold a new packet contract example file from the SSOT template:
 ## Notes
 This skill does not execute packets; it only scaffolds the contract.
 Use `packet-runner` to execute a packet.
-SSOT templates live in `.codex/packet/`.
+SSOT templates live in `.codex/packets/`.

@@ -1,7 +1,7 @@
 # Packet Contract (SSOT)
 
 This document describes the packet contract. The single source of truth for generation is
-`.codex/packet/packet_contract.template.json`.
+`.codex/packets/packet_contract.template.json`.
 
 > Copy to `packet/examples/<packet_id>.json` and fill in.
 

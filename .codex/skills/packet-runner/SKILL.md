@@ -10,6 +10,9 @@ Execute a packet contract with:
 3) **Bounded execution**
 4) **Post-run evidence harness** (Packet-002)
 
+Local WORK runs are approval-free but contract-bounded; violations deny.
+PROMOTE remains the integration gate; local WORK still enforces contract invariants.
+
 This skill entrypoint delegates to the canonical runner:
 - `.codex/tools/run_packet.py`
 
@@ -19,6 +22,12 @@ This skill entrypoint delegates to the canonical runner:
 ## Outputs (Packet-002)
 Always emits a bundle under:
 - `.codex/out/<packet_id>/...` (see `packet/README.md`)
+
+## Optional GitHub issue ops
+If `contract.github.issue` is configured, the runner will:
+1) Ensure the issue exists (created from template if missing)
+2) Comment with evidence paths after the run
+3) Close the issue on PASS (if configured)
 
 ## Hard gates
 - Base repo must be clean unless `worktree_policy.mode=allow_dirty_allowlist`.

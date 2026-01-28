@@ -3,7 +3,7 @@
     ".codex/"
   ],
   "area": "foundation",
-  "base_ref": "main",
+  "base_ref": "HEAD",
   "branch": "packet/packet-000-foundation",
   "budgets": {
     "max_changed_files": 200,
@@ -23,6 +23,20 @@
   },
   "packet_id": "packet-000-foundation",
   "repo": "<org>/<repo>",
+  "net_ops_required": false,
+  "github": {
+    "repo": "<org>/<repo>",
+    "issue": {
+      "title": "packet-000-foundation",
+      "body": "",
+      "template": "packet-default.yml",
+      "labels": [],
+      "milestone": "",
+      "ensure": false,
+      "comment_on_run": false,
+      "close_on_success": false
+    }
+  },
   "run": {
     "commands": [],
     "regen_cmd": "",

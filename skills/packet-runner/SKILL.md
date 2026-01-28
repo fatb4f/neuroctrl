@@ -30,5 +30,5 @@ Always emits a bundle under:
 
 ## Minimal invocation
 ```bash
-python .codex/skills/packet-runner/scripts/run_packet.py .codex/packet/examples/packet-001-worktree-collab.json
+python .codex/skills/packet-runner/scripts/run_packet.py .codex/packets/examples/packet-001-worktree-collab.json
 ```

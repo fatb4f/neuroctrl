@@ -187,6 +187,7 @@ def validate_contract(contract: Dict[str, Any]) -> Optional[str]:
         "base_ref",
         "branch",
         "github_ops_required",
+        "net_ops_required",
         "allowed_paths",
         "forbidden_outputs",
         "worktree_policy",
@@ -204,6 +205,7 @@ def validate_contract(contract: Dict[str, Any]) -> Optional[str]:
         "base_ref",
         "branch",
         "github_ops_required",
+        "net_ops_required",
         "allowed_paths",
         "forbidden_outputs",
         "worktree_policy",
@@ -212,6 +214,7 @@ def validate_contract(contract: Dict[str, Any]) -> Optional[str]:
         "budgets",
         "evidence",
         "evidence_required",
+        "github",
     ]
     err = ensure_no_extra(contract, allowed_keys)
     if err:
@@ -222,6 +225,9 @@ def validate_contract(contract: Dict[str, Any]) -> Optional[str]:
         if err:
             return err
     err = ensure_type("github_ops_required", contract.get("github_ops_required"), bool)
+    if err:
+        return err
+    err = ensure_type("net_ops_required", contract.get("net_ops_required"), bool)
     if err:
         return err
 
@@ -250,6 +256,26 @@ def validate_contract(contract: Dict[str, Any]) -> Optional[str]:
         err = ensure_array_of_strings("evidence_required", contract.get("evidence_required"))
         if err:
             return err
+
+    if "github" in contract:
+        gh = contract.get("github")
+        if not isinstance(gh, dict):
+            return "github must be an object"
+        issue = gh.get("issue")
+        if issue is not None and not isinstance(issue, dict):
+            return "github.issue must be an object"
+        if isinstance(issue, dict):
+            for key in ("labels",):
+                if key in issue and not isinstance(issue.get(key), list):
+                    return f"github.issue.{key} must be array"
+            for key in ("title", "template", "milestone"):
+                if key in issue and not isinstance(issue.get(key), str):
+                    return f"github.issue.{key} must be string"
+            if "body" in issue and not isinstance(issue.get("body"), str):
+                return "github.issue.body must be string"
+            for key in ("ensure", "comment_on_run", "close_on_success"):
+                if key in issue and not isinstance(issue.get(key), bool):
+                    return f"github.issue.{key} must be bool"
 
     return None
 
@@ -294,6 +320,7 @@ def main() -> int:
 
     base_ref = None
     github_ops_required = False
+    net_ops_required = False
     worktree_root = ".codex/.worktrees"
 
     if contract is None:
@@ -301,6 +328,7 @@ def main() -> int:
     else:
         base_ref = contract.get("base_ref")
         github_ops_required = bool(contract.get("github_ops_required", False))
+        net_ops_required = bool(contract.get("net_ops_required", False))
         policy = contract.get("worktree_policy") or {}
         worktree_root = str(policy.get("worktree_root") or worktree_root)
         if not isinstance(base_ref, str) or not base_ref.strip():
@@ -378,6 +406,21 @@ def main() -> int:
             if rc != 0 or rc2 != 0:
                 decision.deny("GITHUB_UNAVAILABLE", "GitHub auth/PR API unavailable")
 
+    if decision.allow and contract is not None and net_ops_required:
+        net = contract.get("network_policy") or {}
+        domains = list(dict.fromkeys((net.get("additional_domains") or [])))
+        if not domains:
+            decision.deny("NET_UNAVAILABLE", "net_ops_required but no additional_domains configured")
+        else:
+            failed = []
+            for domain in domains:
+                rc, out, err = run(["getent", "hosts", domain])
+                probes[f"net_dns:{domain}"] = {"rc": rc, "stdout": out, "stderr": err}
+                if rc != 0:
+                    failed.append(domain)
+            if failed:
+                decision.deny("NET_UNAVAILABLE", f"DNS resolution failed for: {', '.join(failed)}")
+
     evidence = {
         "stage": "S0",
         "timestamp_utc": utc_now(),
@@ -385,6 +428,7 @@ def main() -> int:
         "base_ref": base_ref,
         "head_ref": head_ref if head_ok else "DETACHED",
         "github_ops_required": github_ops_required,
+        "net_ops_required": net_ops_required,
         "tx_mode": tx_mode,
         "probes": probes,
         "decision": "ALLOW" if decision.allow else "DENY",

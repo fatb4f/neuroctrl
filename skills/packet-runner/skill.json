@@ -8,7 +8,7 @@
     "contract_path": {
       "type": "string",
       "required": true,
-      "description": "Path to the packet contract JSON (e.g., .codex/packet/examples/packet-001-worktree-collab.json)"
+      "description": "Path to the packet contract JSON (e.g., .codex/packets/examples/packet-001-worktree-collab.json)"
     }
   }
 }

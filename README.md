@@ -10,7 +10,7 @@ copier copy <TEMPLATE_URL> .codex
 
 ## Run a packet
 ```bash
-bash .codex/skills/packet-runner/scripts/run_packet.sh .codex/packet/examples/packet-000-foundation.json
+bash .codex/skills/packet-runner/scripts/run_packet.sh .codex/packets/examples/packet-000-foundation.json
 ```
 
 ## Evidence output

@@ -23,6 +23,20 @@
   },
   "packet_id": "{{packet_id}}",
   "repo": "{{repo}}",
+  "net_ops_required": false,
+  "github": {
+    "repo": "<org>/<repo>",
+    "issue": {
+      "title": "{{packet_id}}",
+      "body": "",
+      "template": "packet-default.yml",
+      "labels": [],
+      "milestone": "",
+      "ensure": false,
+      "comment_on_run": false,
+      "close_on_success": false
+    }
+  },
   "run": {
     "commands": [],
     "regen_cmd": "",

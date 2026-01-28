@@ -21,7 +21,7 @@ import subprocess
 import sys
 from typing import Any, Dict, List, Tuple
 
-RUNNER_VERSION = "0.1.1"  # Packet-002
+RUNNER_VERSION = "0.1.3"  # Packet-002
 PLANT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -35,6 +35,11 @@ def sh(cmd: List[str], cwd: str | None = None) -> Tuple[int, str, str]:
     )
     out, err = p.communicate()
     return p.returncode, out, err
+
+
+def sh_capture(cmd: List[str], cwd: str | None = None) -> Tuple[int, str, str]:
+    rc, out, err = sh(cmd, cwd=cwd)
+    return rc, out.strip(), err.strip()
 
 
 def die(msg: str, code: int = 2) -> None:
@@ -88,8 +93,68 @@ def git_rev_parse(ref: str, cwd: str | None = None) -> str:
     return out.strip()
 
 
-def utc_now() -> str:
-    return _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z")
+def gh_available() -> bool:
+    rc, _, _ = sh_capture(["gh", "--version"])
+    return rc == 0
+
+
+def gh_find_issue(repo: str, title: str) -> str | None:
+    rc, out, err = sh_capture(
+        [
+            "gh",
+            "issue",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            "all",
+            "--search",
+            f"{title} in:title",
+            "--json",
+            "number",
+            "--jq",
+            ".[0].number",
+        ]
+    )
+    if rc != 0 or not out:
+        return None
+    return out
+
+
+def gh_issue_create(
+    repo: str,
+    title: str,
+    template: str | None,
+    labels: List[str],
+    milestone: str | None,
+    body: str | None,
+) -> Tuple[bool, str]:
+    cmd = ["gh", "issue", "create", "--repo", repo, "--title", title]
+    if not template:
+        if body is None:
+            body = ""
+        cmd += ["--body", body]
+    if template:
+        cmd += ["--template", template]
+    if labels:
+        cmd += ["--label", ",".join(labels)]
+    if milestone:
+        cmd += ["--milestone", milestone]
+    rc, out, err = sh_capture(cmd)
+    return rc == 0, out or err
+
+
+def gh_issue_comment(repo: str, number: str, body: str) -> Tuple[bool, str]:
+    rc, out, err = sh_capture(["gh", "issue", "comment", number, "--repo", repo, "--body", body])
+    return rc == 0, out or err
+
+
+def gh_issue_close(repo: str, number: str, comment: str | None = None) -> Tuple[bool, str]:
+    cmd = ["gh", "issue", "close", number, "--repo", repo]
+    if comment:
+        cmd += ["--comment", comment]
+    rc, out, err = sh_capture(cmd)
+    return rc == 0, out or err
 
 
 
@@ -196,6 +261,7 @@ def main(argv: List[str]) -> int:
     network_policy = require(contract, "network_policy", dict)
     validate_network_policy(network_policy)
     evidence_cfg = require(contract, "evidence", dict)
+    github_cfg = contract.get("github") if isinstance(contract.get("github"), dict) else None
 
     out_dir = str(evidence_cfg.get("out_dir", str(PLANT_ROOT / "out")))
     out_base = pathlib.Path(out_dir) / packet_id
@@ -206,7 +272,7 @@ def main(argv: List[str]) -> int:
     run_log.append(f"packet_id={packet_id}")
     run_log.append(f"contract_path={contract_path}")
     run_log.append(f"runner_version={RUNNER_VERSION}")
-    run_log.append(f"utc_start={utc_now()}")
+    run_log.append(f"utc_start={_dt.datetime.now(_dt.timezone.utc).isoformat().replace('+00:00', 'Z')}")
     run_log.append(f"network_internet_access={network_policy.get('internet_access')}")
 
     decision = "DENY"
@@ -269,7 +335,7 @@ def main(argv: List[str]) -> int:
     except Exception as e:
         reasons.append(f"unhandled_error: {e}")
     finally:
-        run_log.append(f"utc_end={utc_now()}")
+        run_log.append(f"utc_end={_dt.datetime.now(_dt.timezone.utc).isoformat().replace('+00:00', 'Z')}")
         write_text(raw_dir / "runner.log", "\n".join(run_log) + "\n")
 
         meta = {
@@ -282,6 +348,7 @@ def main(argv: List[str]) -> int:
             "base_sha": base_sha,
             "branch": branch,
             "github_ops_required": github_ops_required,
+            "network_policy": network_policy,
             "worktree_path": wt_path,
             "decision": decision,
             "reasons": reasons,
@@ -294,7 +361,6 @@ def main(argv: List[str]) -> int:
                 "worktree_path": wt_path,
             },
         }
-        meta["network_policy"] = network_policy
         write_json(meta_path, meta)
 
         # Always run the Packet-002 collector (even on DENY)
@@ -327,6 +393,69 @@ def main(argv: List[str]) -> int:
     meta["final_status"] = final_status
     meta["evidence_decision"] = evidence_decision
     meta["missing_evidence_outputs"] = missing
+
+    gh_ops: Dict[str, Any] = {"attempted": False}
+    if github_cfg and isinstance(github_cfg.get("issue"), dict):
+        issue_cfg = github_cfg["issue"]
+        repo = str(github_cfg.get("repo") or "").strip()
+        title = str(issue_cfg.get("title") or packet_id).strip()
+        template = (issue_cfg.get("template") or "").strip() or None
+        body = issue_cfg.get("body")
+        labels = issue_cfg.get("labels") or []
+        milestone = (issue_cfg.get("milestone") or "").strip() or None
+        ensure = bool(issue_cfg.get("ensure", False))
+        comment_on_run = bool(issue_cfg.get("comment_on_run", False))
+        close_on_success = bool(issue_cfg.get("close_on_success", False))
+
+        gh_ops["attempted"] = True
+        gh_ops["repo"] = repo
+        gh_ops["title"] = title
+        gh_ops["ensure"] = ensure
+        gh_ops["comment_on_run"] = comment_on_run
+        gh_ops["close_on_success"] = close_on_success
+
+        if not repo:
+            gh_ops["error"] = "missing github.repo"
+        elif not gh_available():
+            gh_ops["error"] = "gh_not_available"
+        else:
+            issue_number = gh_find_issue(repo, title)
+            created = False
+            if not issue_number and ensure:
+                ok, msg = gh_issue_create(repo, title, template, labels, milestone, body)
+                gh_ops["create"] = {"ok": ok, "message": msg}
+                if ok:
+                    issue_number = gh_find_issue(repo, title)
+                    created = True
+            gh_ops["issue_number"] = issue_number
+            gh_ops["created"] = created
+
+            if issue_number and comment_on_run:
+                evidence_dir = str(out_base)
+                evidence_md = str(out_base / "evidence.md")
+                meta_rel = str(out_base / "raw" / "meta.json")
+                comment = "\n".join(
+                    [
+                        "Packet run evidence (local)",
+                        "",
+                        f"- status: {final_status}",
+                        f"- evidence dir: `{evidence_dir}`",
+                        f"- evidence.md: `{evidence_md}`",
+                        f"- meta: `{meta_rel}`",
+                    ]
+                )
+                ok, msg = gh_issue_comment(repo, issue_number, comment)
+                gh_ops["comment"] = {"ok": ok, "message": msg}
+
+            if issue_number and close_on_success and final_status == "PASS":
+                ok, msg = gh_issue_close(repo, issue_number, comment="Closing: packet run PASS with evidence.")
+                gh_ops["close"] = {"ok": ok, "message": msg}
+
+        if github_ops_required and gh_ops.get("error"):
+            decision = "DENY"
+            reasons.append(f"github_ops_failed:{gh_ops['error']}")
+
+    meta["github_ops"] = gh_ops
     write_json(meta_path, meta)
 
     return 0 if final_status == "PASS" else 2
