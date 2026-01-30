@@ -14,8 +14,21 @@ Packets are **mechanical, auditable units of work** executed through Codex skill
 
 ## Files
 - `packet_contract.template.md`: canonical contract template to copy into a packet contract file.
+- `EXEC_PROMPT.template.md`: canonical execution prompt template to copy into a packet prompt file.
+- `../schemas/exec_prompt.schema.json`: schema for the EXEC_PROMPT metadata block.
 
 ## Typical usage
-1) Create contract under `packet/examples/<packet_id>.json`.
-2) Run `packet-runner` with the contract path.
-3) Review evidence under `.codex/out/<packet_id>/`.
+1) Create contract under `packets/<area>/<packet_id>/contract.json`.
+2) Create prompt under `packets/<area>/<packet_id>/EXEC_PROMPT.md`.
+3) Run `packet-runner` with the contract path.
+4) Review evidence under `.codex/out/<packet_id>/`.
+
+Legacy flat layout (deprecated, keep for backward compatibility only):
+- Contract: `packets/examples/<packet_id>.json`
+- Prompt: `packets/examples/<packet_id>.EXEC_PROMPT.md`
+
+Migration helper (dry-run by default):
+```
+python tools/migrate_flat_packets.py --area <area>
+python tools/migrate_flat_packets.py --area <area> --apply
+```

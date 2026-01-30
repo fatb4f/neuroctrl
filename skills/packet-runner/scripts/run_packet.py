@@ -7,19 +7,24 @@ Delegates to the canonical runner:
 
 from __future__ import annotations
 
+import argparse
 import pathlib
 import subprocess
 import sys
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        sys.stderr.write("usage: run_packet.py <contract_path>\n")
-        return 2
-    contract_path = argv[1]
+    ap = argparse.ArgumentParser(description="Codex packet runner wrapper.")
+    ap.add_argument("contract_path")
+    ap.add_argument("--resume", action="store_true", help="Reuse existing worktree on collision.")
+    args = ap.parse_args(argv[1:])
+    contract_path = args.contract_path
     plant_root = pathlib.Path(__file__).resolve().parents[3]
     runner = plant_root / "tools" / "run_packet.py"
-    p = subprocess.run([sys.executable, str(runner), contract_path])
+    cmd = [sys.executable, str(runner), contract_path]
+    if args.resume:
+        cmd.append("--resume")
+    p = subprocess.run(cmd)
     return int(p.returncode)
 
 

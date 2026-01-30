@@ -13,5 +13,5 @@ Rerun options:
 
 ## Minimal run
 ```bash
-python tools/run_packet.py control/packet/examples/<packet_id>.json
+python tools/run_packet.py control/packets/examples/<packet_id>.json
 ```

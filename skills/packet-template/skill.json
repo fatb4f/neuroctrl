@@ -2,7 +2,7 @@
   "skill_id": "packet-template",
   "version": "0.2.0",
   "title": "Packet Template (contract example generator)",
-  "description": "Creates a new packet example contract file under packet/examples using the SSOT template.",
+  "description": "Creates a new packet example contract file under packets/examples using the SSOT template.",
   "entrypoint": "scripts/new_packet.py",
   "inputs": {
     "packet_id": {

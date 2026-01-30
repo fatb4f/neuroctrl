@@ -21,7 +21,7 @@ This skill entrypoint delegates to the canonical runner:
 
 ## Outputs (Packet-002)
 Always emits a bundle under:
-- `.codex/out/<packet_id>/...` (see `packet/README.md`)
+- `.codex/out/<packet_id>/...` (see `packets/README.md`)
 
 ## Optional GitHub issue ops
 If `contract.github.issue` is configured, the runner will:
@@ -36,5 +36,5 @@ If `contract.github.issue` is configured, the runner will:
 
 ## Minimal invocation
 ```bash
-python .codex/skills/packet-runner/scripts/run_packet.py .codex/packet/examples/packet-001-worktree-collab.json
+python .codex/skills/packet-runner/scripts/run_packet.py .codex/packets/examples/packet-001-worktree-collab.json
 ```

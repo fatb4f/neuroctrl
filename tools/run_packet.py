@@ -13,6 +13,7 @@ Notes:
 
 from __future__ import annotations
 
+import argparse
 import datetime as _dt
 import json
 import pathlib
@@ -77,6 +78,68 @@ def validate_network_policy(policy: Dict[str, Any]) -> None:
             raise SystemExit(f"network_policy missing key: {key}")
         if not isinstance(policy[key], typ):
             raise SystemExit(f"network_policy.{key} must be {typ.__name__}")
+
+
+def extract_exec_prompt_metadata(text: str) -> Dict[str, Any]:
+    marker = "```json"
+    start = text.find(marker)
+    if start == -1:
+        raise SystemExit("exec_prompt missing json metadata block")
+    start = text.find("\n", start)
+    if start == -1:
+        raise SystemExit("exec_prompt json block malformed")
+    end = text.find("```", start)
+    if end == -1:
+        raise SystemExit("exec_prompt json block not terminated")
+    payload = text[start:end].strip()
+    try:
+        return json.loads(payload)
+    except Exception as exc:
+        raise SystemExit(f"exec_prompt json parse failed: {exc}")
+
+
+def validate_exec_prompt_metadata(meta: Dict[str, Any]) -> None:
+    required = ["schema_version", "contract_path", "worktree_root", "tasks", "acceptance_checks", "evidence"]
+    missing = [k for k in required if k not in meta]
+    if missing:
+        raise SystemExit(f"exec_prompt missing required keys: {missing}")
+    extras = [k for k in meta.keys() if k not in required + ["notes"]]
+    if extras:
+        raise SystemExit(f"exec_prompt unexpected keys: {sorted(extras)}")
+    for key in ("schema_version", "contract_path", "worktree_root"):
+        if not isinstance(meta.get(key), str):
+            raise SystemExit(f"exec_prompt.{key} must be string")
+    for key in ("tasks", "acceptance_checks", "evidence"):
+        value = meta.get(key)
+        if not isinstance(value, list) or not value:
+            raise SystemExit(f"exec_prompt.{key} must be non-empty array")
+        if any(not isinstance(item, str) for item in value):
+            raise SystemExit(f"exec_prompt.{key} must contain only strings")
+    if "notes" in meta and not isinstance(meta.get("notes"), str):
+        raise SystemExit("exec_prompt.notes must be string")
+
+
+def resolve_exec_prompt_path(contract_path: pathlib.Path) -> pathlib.Path:
+    primary = contract_path.parent / "EXEC_PROMPT.md"
+    if primary.exists():
+        return primary
+    if contract_path.name != "contract.json":
+        legacy = contract_path.with_name(f"{contract_path.stem}.EXEC_PROMPT.md")
+        if legacy.exists():
+            return legacy
+    return primary
+
+
+def validate_exec_prompt(contract_path: pathlib.Path) -> None:
+    prompt_path = resolve_exec_prompt_path(contract_path)
+    if not prompt_path.exists():
+        raise SystemExit(f"exec_prompt missing: {prompt_path}")
+    try:
+        text = prompt_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        raise SystemExit(f"exec_prompt unreadable: {exc}")
+    meta = extract_exec_prompt_metadata(text)
+    validate_exec_prompt_metadata(meta)
 
 
 def git_porcelain(cwd: str | None = None) -> List[str]:
@@ -246,13 +309,62 @@ def read_json(path: pathlib.Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def main(argv: List[str]) -> int:
-    if len(argv) != 2:
-        sys.stderr.write("usage: .codex/tools/run_packet.py <contract_path>\n")
-        return 2
+def parse_args(argv: List[str]) -> argparse.Namespace:
+    ap = argparse.ArgumentParser(description="Run a Codex packet.")
+    ap.add_argument("contract_path", help="Path to packet contract JSON.")
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help="Reuse existing worktree if G0 denies due to collision.",
+    )
+    return ap.parse_args(argv[1:])
 
-    contract_path = argv[1]
+
+def resume_from_collision(
+    g0_path: pathlib.Path,
+    base_ref: str,
+    branch: str,
+) -> Tuple[str | None, str | None, List[str]]:
+    reasons: List[str] = []
+    if not g0_path.exists():
+        return None, None, reasons
+    try:
+        g0 = read_json(g0_path)
+    except Exception:
+        return None, None, reasons
+    if g0.get("deny_code") != "WORKTREE_COLLISION":
+        return None, None, reasons
+    wt_path = g0.get("worktree_path")
+    if not wt_path:
+        return None, None, reasons
+    wt = pathlib.Path(wt_path)
+    if not wt.exists():
+        return None, None, reasons
+    try:
+        head_ref = git_rev_parse("HEAD", cwd=str(wt))
+    except Exception:
+        head_ref = None
+    if head_ref is None:
+        return None, None, reasons
+    try:
+        branch_name = sh_capture(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=str(wt))[1]
+    except Exception:
+        branch_name = ""
+    if branch_name and branch_name != branch:
+        return None, None, reasons
+    try:
+        base_sha = git_rev_parse(base_ref)
+    except Exception:
+        base_sha = None
+    reasons.append("resume_existing_worktree")
+    return str(wt), base_sha, reasons
+
+
+def main(argv: List[str]) -> int:
+    args = parse_args(argv)
+    contract_path = args.contract_path
     contract = load_json(contract_path)
+    validate_exec_prompt(pathlib.Path(contract_path))
 
     packet_id = require(contract, "packet_id", str)
     base_ref = require(contract, "base_ref", str)
@@ -295,12 +407,18 @@ def main(argv: List[str]) -> int:
             raise SystemExit("root preflight denied")
 
         rc = run_gate(PLANT_ROOT / "tools" / "g0_enter_work.py", contract_path, g0_path)
-        if rc != 0:
+        if rc != 0 and args.resume:
+            wt_path, base_sha, resume_reasons = resume_from_collision(g0_path, base_ref, branch)
+            if wt_path:
+                reasons.extend(resume_reasons)
+            else:
+                raise SystemExit("G0 enter work denied")
+        elif rc != 0:
             raise SystemExit("G0 enter work denied")
-
-        g0_evidence = read_json(g0_path)
-        wt_path = g0_evidence.get("worktree_path")
-        base_sha = g0_evidence.get("base_sha") or git_rev_parse(base_ref)
+        else:
+            g0_evidence = read_json(g0_path)
+            wt_path = g0_evidence.get("worktree_path")
+            base_sha = g0_evidence.get("base_sha") or git_rev_parse(base_ref)
         if not wt_path:
             raise SystemExit("worktree_path not set by G0")
 
