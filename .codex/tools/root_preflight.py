@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from validate_plant import validate_repo
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -179,6 +180,60 @@ def validate_evidence(evidence: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def validate_exec_prompt_metadata(meta: Dict[str, Any]) -> Optional[str]:
+    required = ["schema_version", "contract_path", "worktree_root", "tasks", "acceptance_checks", "evidence"]
+    err = ensure_keys(meta, required)
+    if err:
+        return f"exec_prompt: {err}"
+    err = ensure_no_extra(meta, required + ["notes"])
+    if err:
+        return f"exec_prompt: {err}"
+    for key in ("schema_version", "contract_path", "worktree_root"):
+        err = ensure_type(f"exec_prompt.{key}", meta.get(key), str)
+        if err:
+            return err
+    for key in ("tasks", "acceptance_checks", "evidence"):
+        err = ensure_array_of_strings(f"exec_prompt.{key}", meta.get(key))
+        if err:
+            return err
+        if not meta.get(key):
+            return f"exec_prompt.{key} must not be empty"
+    if "notes" in meta:
+        err = ensure_type("exec_prompt.notes", meta.get("notes"), str)
+        if err:
+            return err
+    return None
+
+
+def extract_exec_prompt_metadata(text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    marker = "```json"
+    start = text.find(marker)
+    if start == -1:
+        return None, "exec_prompt missing json metadata block"
+    start = text.find("\n", start)
+    if start == -1:
+        return None, "exec_prompt json block malformed"
+    end = text.find("```", start)
+    if end == -1:
+        return None, "exec_prompt json block not terminated"
+    payload = text[start:end].strip()
+    try:
+        return json.loads(payload), None
+    except Exception as exc:
+        return None, f"exec_prompt json parse failed: {exc}"
+
+
+def resolve_exec_prompt_path(contract_path: Path) -> Path:
+    primary = contract_path.parent / "EXEC_PROMPT.md"
+    if primary.exists():
+        return primary
+    if contract_path.name != "contract.json":
+        legacy = contract_path.with_name(f"{contract_path.stem}.EXEC_PROMPT.md")
+        if legacy.exists():
+            return legacy
+    return primary
+
+
 def validate_contract(contract: Dict[str, Any]) -> Optional[str]:
     required = [
         "packet_id",
@@ -337,6 +392,9 @@ def main() -> int:
     if repo_root is None:
         decision.deny("ENVELOPE_UNAVAILABLE", "not a git repository")
     else:
+        plant_err = validate_repo(repo_root)
+        if plant_err:
+            decision.deny("PLANT_INVALID", plant_err)
         cwd = Path.cwd().resolve()
         if cwd != repo_root.resolve():
             decision.deny("ENVELOPE_UNAVAILABLE", "not running from repo root")
@@ -367,6 +425,24 @@ def main() -> int:
         err = validate_contract(contract)
         if err:
             decision.deny("CONTRACT_INVALID", err)
+
+    if decision.allow and contract is not None:
+        prompt_path = resolve_exec_prompt_path(contract_path)
+        if not prompt_path.exists():
+            decision.deny("EXEC_PROMPT_MISSING", f"exec_prompt missing: {prompt_path}")
+        else:
+            try:
+                prompt_text = prompt_path.read_text(encoding="utf-8")
+            except Exception as exc:
+                decision.deny("EXEC_PROMPT_INVALID", f"exec_prompt unreadable: {exc}")
+            else:
+                meta, meta_err = extract_exec_prompt_metadata(prompt_text)
+                if meta_err:
+                    decision.deny("EXEC_PROMPT_INVALID", meta_err)
+                else:
+                    err = validate_exec_prompt_metadata(meta or {})
+                    if err:
+                        decision.deny("EXEC_PROMPT_INVALID", err)
 
     if decision.allow:
         if shutil.which("git") is None:

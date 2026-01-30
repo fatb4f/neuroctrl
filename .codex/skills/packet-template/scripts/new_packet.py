@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Create a new packet example contract file.
+"""Create a new packet contract and EXEC_PROMPT.
 
 Usage:
   python new_packet.py <packet_id>
   python new_packet.py --packet-id <packet_id> [--area AREA] [--repo REPO]
-                       [--base-ref REF] [--branch BRANCH]
+                       [--base-ref REF] [--branch BRANCH] [--layout dir|flat]
+                       [--examples] [--template PATH] [--prompt-template PATH]
+                       [--validate-prompt]
 """
 
 from __future__ import annotations
@@ -25,10 +27,23 @@ def plant_root() -> pathlib.Path:
     return pathlib.Path(__file__).resolve().parents[3]
 
 
+def load_prompt_validator(root: pathlib.Path):
+    sys.path.insert(0, str(root))
+    from tools.validate_exec_prompt import validate_prompt
+
+    return validate_prompt
+
+
 def template_path(default_root: pathlib.Path, override: str | None) -> pathlib.Path:
     if override:
         return pathlib.Path(override)
-    return default_root / "packet" / "packet_contract.template.json"
+    return default_root / "packets" / "packet_contract.template.json"
+
+
+def prompt_template_path(default_root: pathlib.Path, override: str | None) -> pathlib.Path:
+    if override:
+        return pathlib.Path(override)
+    return default_root / "packets" / "EXEC_PROMPT.template.md"
 
 
 def load_template(path: pathlib.Path) -> Dict[str, Any]:
@@ -62,6 +77,18 @@ def build_contract(template: Dict[str, Any], mapping: Dict[str, str]) -> Dict[st
     return contract
 
 
+def load_prompt_template(path: pathlib.Path) -> str:
+    if not path.exists():
+        die(f"prompt template not found: {path}")
+    return path.read_text(encoding="utf-8")
+
+
+def apply_text_tokens(text: str, mapping: Dict[str, str]) -> str:
+    for key, replacement in mapping.items():
+        text = text.replace(f"{{{{{key}}}}}", replacement)
+    return text
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create a new packet example contract file.")
     parser.add_argument("packet_id", nargs="?", help="packet identifier (e.g., packet-002-something)")
@@ -71,6 +98,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--base-ref", dest="base_ref", help="base ref (e.g., main)")
     parser.add_argument("--branch", help="branch name")
     parser.add_argument("--template", help="path to packet contract template json")
+    parser.add_argument("--prompt-template", help="path to EXEC_PROMPT template md")
+    parser.add_argument("--layout", choices=["dir", "flat"], default="dir", help="packet layout")
+    parser.add_argument("--examples", action="store_true", help="write under packets/examples/")
+    parser.add_argument("--validate-prompt", action="store_true", help="validate EXEC_PROMPT metadata")
     return parser.parse_args(argv[1:])
 
 
@@ -98,13 +129,42 @@ def main(argv: list[str]) -> int:
     root = plant_root()
     template = load_template(template_path(root, args.template))
     contract = build_contract(template, mapping)
+    prompt_template = load_prompt_template(prompt_template_path(root, args.prompt_template))
 
-    out_path = root / "packet" / "examples" / f"{packet_id}.json"
-    if out_path.exists():
-        die(f"already exists: {out_path}")
+    if args.layout == "dir":
+        base_dir = root / "packets" / ("examples" if args.examples else mapping["area"]) / packet_id
+        contract_path = base_dir / "contract.json"
+        prompt_path = base_dir / "EXEC_PROMPT.md"
+        contract_rel = f".codex/packets/{'examples' if args.examples else mapping['area']}/{packet_id}/contract.json"
+    else:
+        base_dir = root / "packets" / "examples"
+        contract_path = base_dir / f"{packet_id}.json"
+        prompt_path = base_dir / f"{packet_id}.EXEC_PROMPT.md"
+        contract_rel = f".codex/packets/examples/{packet_id}.json"
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if contract_path.exists():
+        die(f"already exists: {contract_path}")
+    if prompt_path.exists():
+        die(f"already exists: {prompt_path}")
+
+    contract_path.parent.mkdir(parents=True, exist_ok=True)
+    contract_path.write_text(json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    prompt_text = apply_text_tokens(
+        prompt_template,
+        {
+            "packet_id": packet_id,
+            "area": mapping["area"],
+            "contract_path": contract_rel,
+            "worktree_root": f".codex/.worktrees/{packet_id}/",
+        },
+    )
+    prompt_path.write_text(prompt_text, encoding="utf-8")
+    if args.validate_prompt:
+        validate_prompt = load_prompt_validator(root)
+        err = validate_prompt(prompt_path)
+        if err:
+            die(err)
     return 0
 
 
